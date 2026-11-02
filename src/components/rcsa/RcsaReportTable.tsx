@@ -4,6 +4,7 @@ import React from "react";
 import { RCSAData } from "@/lib/rcsa-data";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { formatDate } from "@/lib/date";
 
 const badgeDecision = (d?: RCSAData["decision"] | null) => {
   if (d === "approved") return "bg-green-600 text-white";
@@ -169,7 +170,10 @@ export function RcsaReportTable({ data }: { data: RCSAData[] }) {
                     <Badge className={badgeDecision(row.decision)}>{row.decision ?? "-"}</Badge>
                   </td>
                   <td className="px-2 py-2 border-r border-gray-200">{(row as any).reviewer_name ?? "-"}</td>
-                  <td className="px-2 py-2 border-r border-gray-200">{(row as any).reviewed_at ?? "-"}</td>
+                  <td className="px-2 py-2 border-r border-gray-200 whitespace-nowrap">
+                    {(row as any).reviewed_at ? formatDate((row as any).reviewed_at) : "-"}
+                  </td>
+
                   <td className="px-2 py-2">
                     <Textarea value={(row as any).note ?? ""} readOnly className="h-10 text-xs resize-y" />
                   </td>

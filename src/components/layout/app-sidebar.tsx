@@ -32,6 +32,7 @@ import {
   ChevronDown,
   LogOut,
   Shield,
+  Database,
   type LucideIcon,
 } from "lucide-react";
 
@@ -99,10 +100,7 @@ function NavItemWithSubmenu({
 
   if (!isClient) {
     return (
-      <SidebarMenuButton
-        className="justify-between w-full"
-        isActive={isAnySubmenuActive}
-      >
+      <SidebarMenuButton className="justify-between w-full" isActive={isAnySubmenuActive}>
         <div className="flex items-center gap-2">
           <Icon />
           <span>{title}</span>
@@ -115,10 +113,7 @@ function NavItemWithSubmenu({
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <CollapsibleTrigger asChild>
-        <SidebarMenuButton
-          className="justify-between w-full"
-          isActive={isAnySubmenuActive}
-        >
+        <SidebarMenuButton className="justify-between w-full" isActive={isAnySubmenuActive}>
           <div className="flex items-center gap-2">
             <Icon />
             <span>{title}</span>
@@ -135,21 +130,14 @@ function NavItemWithSubmenu({
       <CollapsibleContent>
         <SidebarMenuSub>
           {submenu.map((item) => {
-            const isActive =
-              pathname === item.href || pathname.startsWith(item.href + "/");
-
+            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
             const SubIcon = item.icon;
 
             return (
               <SidebarMenuSubItem key={item.name}>
                 <SidebarMenuSubButton asChild isActive={isActive}>
-                  <Link
-                    href={item.href}
-                    className="flex items-center gap-2 whitespace-normal h-auto"
-                  >
-                    {SubIcon && (
-                      <SubIcon className="h-4 w-4 text-muted-foreground" />
-                    )}
+                  <Link href={item.href} className="flex items-center gap-2 whitespace-normal h-auto">
+                    {SubIcon && <SubIcon className="h-4 w-4 text-muted-foreground" />}
                     <span>{item.name}</span>
                   </Link>
                 </SidebarMenuSubButton>
@@ -190,48 +178,47 @@ export function AppSidebar() {
 
   if (!isReady) return null;
 
-  // ===== RBAC (BERDASARKAN PERMISSIONS DARI /me) =====
+  // RBAC dari /me
   const perms = user?.permissions || ({} as Record<string, any>);
+  const hasPerm = (key?: PermKey) => (!key ? true : !!perms?.[key]);
 
-  const hasPerm = (key?: PermKey) => {
-    if (!key) return true;
-    return !!perms?.[key];
-  };
-
+  // ✅ Definisi "Admin Panel" jangan pakai can_read.
+  // Admin panel itu untuk pengelola (provisioning).
   const isAdminPanelAllowed = hasPerm("can_provision");
-  const canApprove = hasPerm("can_approve");
 
-  // ===== MENU USER (PIC / Unit Staff / Unit Supervisor / Staff) =====
-  // Admin juga tetap boleh lihat menu user
+  // menu user (PIC/staff): boleh akses fitur operasional
+  const canSeeAssessment =
+    hasPerm("can_view") || hasPerm("can_create") || hasPerm("can_update") || hasPerm("can_read");
+
+  // riwayat seharusnya minimal read/view
+  const canSeeArchive = hasPerm("can_view") || hasPerm("can_read");
+
   const userNavItems: MenuItem[] = useMemo(() => {
-    const items: MenuItem[] = [
-      { icon: FileText, title: "Risk Control Self-Assessment", href: "/rcsa" },
-    ];
-
-    if (canApprove) {
-      items.push({ icon: FileText, title: "Review RCSA", href: "/rcsa-review" });
-    }
-
+    const items: MenuItem[] = [];
+    if (canSeeAssessment) items.push({ icon: FileText, title: "RCSA Assessment", href: "/rcsa" });
+    if (canSeeArchive) items.push({ icon: FileText, title: "Riwayat Assessment", href: "/rcsa-archive" });
     return items;
-  }, [canApprove]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [perms]);
 
-  // ===== MENU ADMIN PANEL =====
   const adminNavItems: MenuItem[] = useMemo(() => {
+    // 🔒 Karena permission kamu saat ini belum memisahkan "read biasa" vs "read report admin",
+    // maka report admin sementara dikunci ke can_provision supaya PIC tidak ikut buka report.
     const items: MenuItem[] = [
       {
-        icon: LayoutDashboard,
-        title: "RCSA",
+        icon: Database,
+        title: "Manajemen RCSA",
         submenu: [
+          { icon: LayoutDashboard, name: "Dashboard", href: "/admin/dashboard", permKey: "can_provision" },
           { icon: Shield, name: "Kelola Master RCSA", href: "/admin/rcsa-management", permKey: "can_provision" },
-          { icon: ShieldAlert, name: "Approval Master RCSA", href: "/admin/rcsa-master-approval", permKey: "can_approve" },
-          { icon: FileText, name: "Review RCSA", href: "/admin/rcsa-review", permKey: "can_approve" },
-          { icon: FileText, name: "Laporan RCSA", href: "/admin/rcsa-report", permKey: "can_read" },
+          { icon: ShieldAlert, name: "Approval Master RCSA", href: "/admin/rcsa-master-approval", permKey: "can_provision" },
+          { icon: FileText, name: "Review Assessment", href: "/admin/rcsa-review", permKey: "can_provision" },
+          { icon: FileText, name: "Report RCSA", href: "/admin/rcsa-report", permKey: "can_provision" },
         ],
       },
-      { icon: ServerCog, title: "Management", href: "/setting", permKey: "can_provision" },
+      { icon: ServerCog, title: "Manajemen User", href: "/setting/user", permKey: "can_provision" },
     ];
 
-    // Filter berdasarkan permKey
     return items
       .filter((it) => hasPerm(it.permKey))
       .map((it) => {
@@ -240,12 +227,13 @@ export function AppSidebar() {
         return { ...it, submenu: filteredSub };
       })
       .filter((it) => !it.submenu || it.submenu.length > 0);
-  }, [perms]); // perms berubah -> menu berubah
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [perms]);
 
   const displayName =
     user?.name ||
     user?.user_id ||
-    (user?.email ? user.email.split("@")[0] : "Profile");
+    (user?.email ? user.email.split("@")[0] : "Profil");
 
   const handleLogout = () => {
     logout();
@@ -257,10 +245,7 @@ export function AppSidebar() {
       <Sidebar collapsible="icon">
         <div className="flex h-full flex-col">
           <SidebarHeader className="p-4 border-b border-sidebar-border">
-            <Link
-              href="#"
-              className="flex items-center gap-3 text-sidebar-foreground transition-all"
-            >
+            <Link href="#" className="flex items-center gap-3 text-sidebar-foreground transition-all">
               <div
                 className={cn(
                   "flex items-center justify-center rounded-xl bg-white/4 ring-2 ring-white/4 shadow-sm transition-all duration-300",
@@ -280,9 +265,7 @@ export function AppSidebar() {
               {!collapsed && (
                 <div className="flex flex-col leading-tight">
                   <span className="text-sm font-semibold tracking-wide">RCSA</span>
-                  <span className="text-xs text-sidebar-foreground/70">
-                    Management System
-                  </span>
+                  <span className="text-xs text-sidebar-foreground/70">Management System</span>
                 </div>
               )}
             </Link>
@@ -290,23 +273,18 @@ export function AppSidebar() {
 
           <SidebarContent>
             <SidebarMenu>
-              {/* USER SIDE: selalu tampil untuk semua role */}
               {userNavItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <NavItem item={item} />
                 </SidebarMenuItem>
               ))}
 
-              {/* ADMIN PANEL: hanya jika can_provision */}
               {isAdminPanelAllowed && (
                 <>
                   <div className="p-2 pt-4">
                     <motion.h4
                       initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{
-                        opacity: collapsed ? 0 : 1,
-                        scale: collapsed ? 0.8 : 1,
-                      }}
+                      animate={{ opacity: collapsed ? 0 : 1, scale: collapsed ? 0.8 : 1 }}
                       transition={{ duration: 0.2 }}
                       className="text-xs font-semibold text-gray-400 uppercase tracking-widest pl-2"
                     >
@@ -326,7 +304,6 @@ export function AppSidebar() {
 
           <SidebarFooter>
             <SidebarMenu>
-              {/* PROFILE */}
               <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={pathname === "/setting/profile"}>
                   <Link href="/setting/profile">
@@ -336,7 +313,6 @@ export function AppSidebar() {
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
-              {/* LOGOUT */}
               <SidebarMenuItem>
                 <SidebarMenuButton
                   onClick={() => setShowConfirm(true)}
@@ -351,7 +327,6 @@ export function AppSidebar() {
         </div>
       </Sidebar>
 
-      {/* Modal Konfirmasi Logout */}
       <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
         <DialogContent>
           <DialogHeader>

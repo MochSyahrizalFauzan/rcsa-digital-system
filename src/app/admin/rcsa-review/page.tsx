@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,9 +12,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {History, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-// ✅ tambahkan 3 import ini
 import { RiskTable } from "@/components/rcsa/RcsaTable";
 import type { RCSAData } from "@/lib/rcsa-data";
 import { toCamelCase } from "@/lib/utils";
@@ -52,7 +52,6 @@ type QueueItem = {
   created_at: string;
   updated_at: string;
 
-  // kalau dari endpoint queue kamu sudah ada ini, bagus:
   unit_id?: number;
   rcsa_master_id?: number;
 };
@@ -66,6 +65,21 @@ type NoteItem = {
 };
 
 const API_BASE = "http://localhost:5000";
+
+function formatDateTime(iso?: string | null) {
+  if (!iso) return "-";
+  try {
+    return new Date(iso).toLocaleString("id-ID", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return String(iso);
+  }
+}
 
 export default function AdminRcsaReviewPage() {
   const { toast } = useToast();
@@ -82,6 +96,8 @@ export default function AdminRcsaReviewPage() {
   const [notesLoading, setNotesLoading] = useState(false);
   const [history, setHistory] = useState<NoteItem[]>([]);
 
+  const count = items.length;
+
   const fetchQueue = async () => {
     setLoading(true);
     try {
@@ -90,12 +106,13 @@ export default function AdminRcsaReviewPage() {
       });
       if (!res.ok) throw new Error("Gagal ambil queue");
       const data = await res.json();
-
-      // ✅ optional: kalau API balikan snake_case, convert dulu biar konsisten
-      // tapi items kamu sekarang sudah snake_case, jadi keep aja
-      setItems(data);
+      setItems(Array.isArray(data) ? data : []);
     } catch (e: any) {
-      toast({ title: "Gagal memuat queue", description: e?.message, variant: "destructive" });
+      toast({
+        title: "Gagal memuat queue",
+        description: e?.message,
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -105,8 +122,6 @@ export default function AdminRcsaReviewPage() {
     fetchQueue();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const count = items.length;
 
   const openReview = async (row: QueueItem) => {
     setSelected(row);
@@ -120,7 +135,10 @@ export default function AdminRcsaReviewPage() {
       const res = await fetch(`${API_BASE}/rcsa/review/${row.id}/notes`, {
         credentials: "include",
       });
-      if (res.ok) setHistory(await res.json());
+      if (res.ok) {
+        const data = await res.json();
+        setHistory(Array.isArray(data) ? data : []);
+      }
     } catch {
       // ignore
     } finally {
@@ -141,20 +159,26 @@ export default function AdminRcsaReviewPage() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ note, decision }),
+        body: JSON.stringify({ note: note.trim(), decision }),
       });
 
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json?.message || "Gagal submit review");
 
-      toast({ title: "Review tersimpan ✅", description: `Assessment #${selected.id} ${decision}` });
+      toast({
+        title: `Review Assessment  ${decision}`,
+        description: `Assessment #${selected.id} ${decision}`,
+      });
 
       setItems((prev) => prev.filter((x) => x.id !== selected.id));
-
       setOpen(false);
       setSelected(null);
     } catch (e: any) {
-      toast({ title: "Gagal simpan review", description: e?.message, variant: "destructive" });
+      toast({
+        title: "Gagal simpan review",
+        description: e?.message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -162,26 +186,22 @@ export default function AdminRcsaReviewPage() {
     if (!lvl) return <Badge variant="outline">-</Badge>;
     const map: Record<string, string> = {
       Rendah: "bg-green-600",
-      Sedang: "bg-yellow-500",
+      Sedang: "bg-yellow-500 text-black",
       Tinggi: "bg-red-500",
       "Sangat Tinggi": "bg-red-700",
     };
     return <Badge className={map[lvl] || ""}>{lvl}</Badge>;
   };
 
-  // ✅ mapping selected (snake_case) -> RCSAData (camelCase)
   const selectedAsRCSAData = useMemo((): RCSAData[] => {
     if (!selected) return [];
 
-    // 1) convert snake_case -> camelCase
     const c = toCamelCase(selected) as any;
 
-    // 2) bentuk object sesuai RCSAData yang dipakai RiskTable
     const row: RCSAData = {
       id: c.id,
       no: 1,
 
-      // ini harus cocok dengan RiskTable kamu
       unit_id: c.unitId ?? c.unit_id ?? null,
       rcsa_master_id: c.rcsaMasterId ?? c.rcsa_master_id ?? null,
 
@@ -201,7 +221,6 @@ export default function AdminRcsaReviewPage() {
       pic: c.pic ?? null,
 
       keteranganUser: c.keteranganUser ?? null,
-      keteranganAdmin: null,
 
       status: (c.status ?? "submitted") as any,
     };
@@ -213,184 +232,264 @@ export default function AdminRcsaReviewPage() {
 
   return (
     <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between gap-3">
+      {/* HEADER (rapi, tidak dobel) */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Queue Review RCSA</h1>
+          <h1 className="text-2xl font-bold">Queue Review RCSA Asessment</h1>
           <p className="text-muted-foreground text-sm">
             Daftar assessment yang menunggu keputusan reviewer.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          <Badge variant="outline">{count} submitted</Badge>
-          <Button variant="outline" onClick={fetchQueue}>
+          <Button
+            asChild
+            size="sm"
+            className="gap-2"
+          >
+            <Link href="/admin/rcsa-review/rcsa-history">
+              <History className="h-4 w-4" />
+              Riwayat Review
+            </Link>
+          </Button>
+          <Button
+            size="sm"
+            className="gap-2"
+            onClick={fetchQueue}>
+            <RefreshCw className="h-4 w-4" />
             Refresh
           </Button>
         </div>
       </div>
 
       {count === 0 ? (
-        <div className="border rounded-lg p-6 text-muted-foreground">
+        <div className="border rounded-lg p-6 text-muted-foreground bg-white">
           Tidak ada assessment yang menunggu review.
         </div>
       ) : (
         <div className="border rounded-lg overflow-hidden bg-white">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50">
-              <tr className="text-left">
-                <th className="p-3">ID</th>
-                <th className="p-3">Unit</th>
-                <th className="p-3">PIC</th>
-                <th className="p-3">Potensi Risiko</th>
-                <th className="p-3">Inheren</th>
-                <th className="p-3">Residual</th>
-                <th className="p-3 text-right">Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((r) => (
-                <tr key={r.id} className="border-t">
-                  <td className="p-3 font-semibold">#{r.id}</td>
-                  <td className="p-3">
-                    <div className="font-medium">{r.unit_name}</div>
-                    <div className="text-xs text-muted-foreground">{r.unit_type}</div>
-                  </td>
-                  <td className="p-3">
-                    <div className="font-medium">{r.created_by_name}</div>
-                    <div className="text-xs text-muted-foreground">{r.created_by_user_id}</div>
-                  </td>
-                  <td className="p-3">
-                    <div className="font-medium">{r.potensi_risiko || r.rcsa_name}</div>
-                    <div className="text-xs text-muted-foreground line-clamp-2">{r.rcsa_description}</div>
-                  </td>
-                  <td className="p-3">
-                    <div className="flex items-center gap-2">
-                      {levelBadge(r.level_inheren)}
-                      <span className="text-xs text-muted-foreground">({r.nilai_inheren ?? "-"})</span>
-                    </div>
-                  </td>
-                  <td className="p-3">
-                    <div className="flex items-center gap-2">
-                      {levelBadge(r.level_residual)}
-                      <span className="text-xs text-muted-foreground">({r.nilai_residual ?? "-"})</span>
-                    </div>
-                  </td>
-                  <td className="p-3 text-right">
-                    <Button size="sm" onClick={() => openReview(r)}>
-                      Review
-                    </Button>
-                  </td>
+          <div className="overflow-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/40">
+                <tr className="text-left">
+                  <th className="p-3 w-[80px]">ID</th>
+                  <th className="p-3 w-[260px]">Unit</th>
+                  <th className="p-3 w-[220px]">PIC</th>
+                  <th className="p-3 min-w-[320px]">Potensi Risiko</th>
+                  <th className="p-3 w-[180px]">Inheren</th>
+                  <th className="p-3 w-[180px]">Residual</th>
+                  <th className="p-3 text-right w-[140px]">Aksi</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+
+              <tbody>
+                {items.map((r) => (
+                  <tr key={r.id} className="border-t hover:bg-muted/20">
+                    <td className="p-3 font-semibold">#{r.id}</td>
+
+                    <td className="p-3">
+                      <div className="font-medium truncate">{r.unit_name}</div>
+                      <div className="text-xs text-muted-foreground">{r.unit_type}</div>
+                    </td>
+
+                    <td className="p-3">
+                      <div className="font-medium truncate">{r.created_by_name}</div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        {r.created_by_user_id}
+                      </div>
+                    </td>
+
+                    <td className="p-3">
+                      <div className="font-medium">
+                        {r.potensi_risiko || r.rcsa_name}
+                      </div>
+                      <div className="text-xs text-muted-foreground line-clamp-2">
+                        {r.rcsa_description}
+                      </div>
+                    </td>
+
+                    <td className="p-3">
+                      <div className="flex items-center gap-2">
+                        {levelBadge(r.level_inheren)}
+                        <span className="text-xs text-muted-foreground">
+                          ({r.nilai_inheren ?? "-"})
+                        </span>
+                      </div>
+                    </td>
+
+                    <td className="p-3">
+                      <div className="flex items-center gap-2">
+                        {levelBadge(r.level_residual)}
+                        <span className="text-xs text-muted-foreground">
+                          ({r.nilai_residual ?? "-"})
+                        </span>
+                      </div>
+                    </td>
+
+                    <td className="p-3 text-right">
+                      <Button size="sm" onClick={() => openReview(r)}>
+                        Review
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* footer info kecil */}
+          <div className="border-t p-3 text-xs text-muted-foreground">
+            Terakhir diperbarui: {formatDateTime(new Date().toISOString())}
+          </div>
         </div>
       )}
 
-      {/* MODAL REVIEW */}
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="max-w-[95vw] w-[95vw] max-h-[90vh] overflow-hidden p-0">
-    {/* HEADER */}
-    <div className="p-6 pb-3 border-b">
-      <DialogHeader>
-        <DialogTitle>
-          Review Assessment {selected ? `#${selected.id}` : ""}
-        </DialogTitle>
-      </DialogHeader>
-    </div>
-
-    {/* BODY SCROLL (ini yang penting) */}
-    <div className="px-6 py-4 overflow-y-auto max-h-[78vh] space-y-4">
-      {selected && (
-        <>
-          {/* TABEL RCSA (READ-ONLY) */}
-          <div className="border rounded-lg bg-white">
-            <div className="max-h-[40vh] overflow-auto">
-              <RiskTable
-                mode="reviewer"
-                data={selectedAsRCSAData}
-                showSubmitButton={false}
-                // onChange tidak perlu di reviewer mode
-              />
-            </div>
+      {/* MODAL REVIEW (lebih stabil, header/body/footer fixed) */}
+      <Dialog
+        open={open}
+        onOpenChange={(v) => {
+          setOpen(v);
+          if (!v) {
+            setSelected(null);
+            setHistory([]);
+            setNote("");
+          }
+        }}
+      >
+        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[90vh] overflow-hidden p-0">
+          {/* HEADER */}
+          <div className="p-6 pb-3 border-b">
+            <DialogHeader>
+              <DialogTitle>
+                Review Assessment {selected ? `#${selected.id}` : ""}
+              </DialogTitle>
+            </DialogHeader>
           </div>
 
-          {/* RIWAYAT CATATAN */}
-          <div className="border rounded-md p-3 bg-white">
-            <div className="font-semibold mb-2">Riwayat Catatan</div>
-
-            {notesLoading ? (
-              <div className="text-sm text-muted-foreground">Memuat riwayat...</div>
-            ) : history.length === 0 ? (
-              <div className="text-sm text-muted-foreground">Belum ada catatan sebelumnya.</div>
-            ) : (
-              <div className="space-y-2 max-h-[22vh] overflow-auto pr-1">
-                {history.map((h) => (
-                  <div key={h.id} className="border rounded p-2">
-                    <div className="flex items-center justify-between">
-                      <div className="text-xs text-muted-foreground">{h.reviewer_name}</div>
-                      <Badge className={h.decision === "approved" ? "bg-green-600" : "bg-red-600"}>
-                        {h.decision.toUpperCase()}
-                      </Badge>
-                    </div>
-                    <div className="text-sm mt-1">{h.note}</div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {new Date(h.created_at).toLocaleString()}
-                    </div>
+          {/* BODY SCROLL */}
+          <div className="px-6 py-4 overflow-y-auto max-h-[78vh] space-y-4">
+            {selected && (
+              <>
+                {/* TABEL RCSA (read-only) */}
+                <div className="border rounded-lg bg-white">
+                  <div className="max-h-[42vh] overflow-auto">
+                    <RiskTable
+                      mode="reviewer"
+                      data={selectedAsRCSAData}
+                      showSubmitButton={false}
+                    />
                   </div>
-                ))}
-              </div>
+                </div>
+
+                {/* RIWAYAT CATATAN */}
+                <div className="border rounded-md p-3 bg-white">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="font-semibold">Riwayat Catatan</div>
+                    <Badge variant="secondary" className="px-3 py-1">
+                      {history.length} catatan
+                    </Badge>
+                  </div>
+
+                  {notesLoading ? (
+                    <div className="text-sm text-muted-foreground mt-2">
+                      Memuat riwayat...
+                    </div>
+                  ) : history.length === 0 ? (
+                    <div className="text-sm text-muted-foreground mt-2">
+                      Belum ada catatan sebelumnya.
+                    </div>
+                  ) : (
+                    <div className="mt-3 space-y-2 max-h-[22vh] overflow-auto pr-1">
+                      {history.map((h) => (
+                        <div key={h.id} className="border rounded p-2">
+                          <div className="flex items-center justify-between">
+                            <div className="text-xs text-muted-foreground">
+                              {h.reviewer_name}
+                            </div>
+                            <Badge
+                              className={
+                                h.decision === "approved"
+                                  ? "bg-green-600"
+                                  : "bg-red-600"
+                              }
+                            >
+                              {h.decision.toUpperCase()}
+                            </Badge>
+                          </div>
+
+                          <div className="text-sm mt-1 whitespace-pre-wrap">
+                            {h.note}
+                          </div>
+
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {formatDateTime(h.created_at)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* FORM KEPUTUSAN */}
+                <div className="border rounded-md p-3 space-y-3 bg-white">
+                  <div className="font-semibold">Keputusan Reviewer</div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant={decision === "approved" ? "default" : "outline"}
+                      onClick={() => setDecision("approved")}
+                      className={
+                        decision === "approved"
+                          ? "bg-green-600 hover:bg-green-700"
+                          : ""
+                      }
+                    >
+                      Approve
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant={decision === "rejected" ? "default" : "outline"}
+                      onClick={() => setDecision("rejected")}
+                      className={
+                        decision === "rejected"
+                          ? "bg-red-600 hover:bg-red-700"
+                          : ""
+                      }
+                    >
+                      Reject
+                    </Button>
+
+                    <Badge variant="outline" className="ml-auto">
+                      Pilihan: {decision.toUpperCase()}
+                    </Badge>
+                  </div>
+
+                  <Textarea
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="Tulis catatan reviewer (wajib)..."
+                    className="min-h-[120px]"
+                  />
+                </div>
+              </>
             )}
           </div>
 
-          {/* FORM KEPUTUSAN */}
-          <div className="border rounded-md p-3 space-y-3 bg-white">
-            <div className="font-semibold">Keputusan Reviewer</div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant={decision === "approved" ? "default" : "outline"}
-                onClick={() => setDecision("approved")}
-                className={decision === "approved" ? "bg-green-600 hover:bg-green-700" : ""}
-              >
-                Approve
+          {/* FOOTER */}
+          <div className="p-6 pt-3 border-t">
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setOpen(false)}>
+                Batal
               </Button>
-              <Button
-                type="button"
-                variant={decision === "rejected" ? "default" : "outline"}
-                onClick={() => setDecision("rejected")}
-                className={decision === "rejected" ? "bg-red-600 hover:bg-red-700" : ""}
-              >
-                Reject
+              <Button onClick={submitReview} disabled={!note.trim()}>
+                Simpan Review
               </Button>
-            </div>
-
-            <Textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Tulis catatan reviewer (wajib)..."
-              className="min-h-[120px]"
-            />
+            </DialogFooter>
           </div>
-        </>
-      )}
-    </div>
-
-    {/* FOOTER */}
-    <div className="p-6 pt-3 border-t">
-      <DialogFooter className="gap-2">
-        <Button variant="outline" onClick={() => setOpen(false)}>
-          Batal
-        </Button>
-        <Button onClick={submitReview}>
-          Simpan Review
-        </Button>
-      </DialogFooter>
-    </div>
-      </DialogContent>
-    </Dialog>
-
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

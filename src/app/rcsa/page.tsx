@@ -189,7 +189,7 @@ export default function Rcsapage() {
         const last = autosaveToastCooldownRef.current.get(rowKey) ?? 0;
         if (now - last > AUTOSAVE_TOAST_COOLDOWN) {
           toast({
-            title: "Draft tersimpan",
+            title: "Draft Berhasil Tersimpan",
             description: "Perubahan Anda disimpan otomatis.",
             duration: 1500,
           });
@@ -274,7 +274,7 @@ export default function Rcsapage() {
         await upsertRowByKey(rowKey);
       }
 
-      toast({ title: "Draf berhasil disimpan ✅" });
+      toast({ title: "Draf Data Assessment berhasil Tersimpan" });
     } catch (err) {
       console.error("Gagal simpan semua:", err);
       toast({
@@ -319,7 +319,7 @@ export default function Rcsapage() {
 
     if (!isRowComplete(row)) {
       toast({
-        title: "Data belum lengkap",
+        title: "Data RCSA Assessment belum lengkap",
         description: "Lengkapi semua kolom wajib sebelum mengirim.",
         variant: "destructive",
       });
@@ -334,7 +334,7 @@ export default function Rcsapage() {
         return remaining.map((r, idx) => ({ ...r, no: idx + 1 }));
       });
 
-      toast({ title: "Risiko terkirim 🎉", description: "Data berhasil dikirim ke admin untuk ditinjau." });
+      toast({ title: "Data RCSA Assessment sukses Terkirim", description: "Assessment terkirim ke Admin untuk di tinjau" });
     } catch (err: any) {
       console.error("Submit gagal:", err);
       toast({
@@ -371,7 +371,7 @@ export default function Rcsapage() {
       const incomplete = data.filter((r) => !isRowComplete(r));
       if (incomplete.length > 0) {
         toast({
-          title: "Data belum lengkap",
+          title: "Data RCSA Assessment belum lengkap",
           description: `Ada ${incomplete.length} item belum lengkap. Lengkapi sebelum kirim semua.`,
           variant: "destructive",
         });
@@ -382,7 +382,7 @@ export default function Rcsapage() {
         await submitRcsaAssessment(row.id!);
       }
 
-      toast({ title: "Semua data terkirim 🎉", description: "Semua data RCSA berhasil dikirim untuk ditinjau admin." });
+      toast({ title: "Data RCSA Assessment sukses Terkirim", description: "Semua data RCSA berhasil dikirim untuk ditinjau admin." });
 
       setData([]);
       setActiveRiskIndex(0);
@@ -418,7 +418,7 @@ export default function Rcsapage() {
 
         <div className="flex items-center gap-2">
           <Button
-            type="button" // ✅ penting
+            type="button" 
             variant="outline"
             onClick={handleSaveAll}
             disabled={isSavingAll || isDataEmpty}
@@ -428,15 +428,15 @@ export default function Rcsapage() {
           </Button>
 
           <AlertDialog>
-            <AlertDialogTrigger asChild>
+            {/* <AlertDialogTrigger asChild>
               <Button
-                type="button" // ✅ penting
+                type="button" // 
                 disabled={isDataEmpty}
                 className="bg-blue-600 hover:bg-blue-700 text-white transition-colors"
               >
                 <Send className="mr-2 h-4 w-4" /> Kirim Semua ({totalRisks} Item)
               </Button>
-            </AlertDialogTrigger>
+            </AlertDialogTrigger> */}
 
             <AlertDialogContent>
               <AlertDialogHeader>
@@ -448,18 +448,18 @@ export default function Rcsapage() {
               </AlertDialogHeader>
 
               <AlertDialogFooter>
-                {/* ✅ asChild biar kita bisa kontrol type */}
+                {/*  asChild biar kita bisa kontrol type */}
                 <AlertDialogCancel asChild>
                   <Button type="button" variant="outline">
                     Batal
                   </Button>
                 </AlertDialogCancel>
 
-                <AlertDialogAction asChild>
+                {/* <AlertDialogAction asChild>
                   <Button type="button" onClick={handleSubmitAll}>
                     Ya, Kirim Semua Data
                   </Button>
-                </AlertDialogAction>
+                </AlertDialogAction> */}
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>

@@ -14,11 +14,14 @@ type AuthContextType = {
   user: User | null;
   isAuthenticated: boolean;
   isReady: boolean;
+  authError: string | null;
+  clearAuthError: () => void;
   login: (user_id: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
   fetchWithAuth: (url: string, options?: RequestInit) => Promise<Response>;
 };
+
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -38,13 +41,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isReady, setIsReady] = useState(false);
   const router = useRouter();
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  const clearAuthError = () => setAuthError(null);
+
 
   // Ambil session aktif (user) dari server via cookie
   const fetchSession = useCallback(async () => {
     const res = await fetch("http://localhost:5000/me", {
       method: "GET",
       credentials: "include",
-      cache: "no-store", // ✅ penting biar gak 304 / cache
+      cache: "no-store", //  biar gak 304 / cache
     });
 
     if (!res.ok) {
@@ -71,28 +78,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })();
   }, [fetchSession]);
 
-  // 🔹 Login → server set cookie, lalu refresh session dari /me (source of truth)
-  const login = async (user_id: string, password: string) => {
-    try {
-      const res = await fetch("http://localhost:5000/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ user_id, password }),
-      });
+  // Login → server set cookie, lalu refresh session dari /me (source of truth)
+const login = async (user_id: string, password: string) => {
+  try {
+    setAuthError(null);
 
-      if (!res.ok) return false;
+    const res = await fetch("http://localhost:5000/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ user_id, password }),
+    });
 
-      // ✅ jangan pakai response login sebagai sumber user utama
-      // biar konsisten, langsung tarik /me
-      await fetchSession();
-
-      return true;
-    } catch (err) {
-      console.error("❌ Login error:", err);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setAuthError(data?.message || "Login gagal");
       return false;
     }
-  };
+
+    await fetchSession();
+    return true;
+  } catch (err) {
+    console.error("❌ Login error:", err);
+    setAuthError("Gagal terhubung ke server. Coba lagi.");
+    return false;
+  }
+};
+
 
   // Logout → server hapus cookie
   const logout = useCallback(async () => {
@@ -109,7 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [router]);
 
-  // ✅ expose agar komponen lain bisa refresh permission kalau dibutuhkan
+  // expose agar komponen lain bisa refresh permission kalau dibutuhkan
   const refreshSession = useCallback(async () => {
     try {
       await fetchSession();
@@ -136,17 +148,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isAuthenticated: !!user,
-        isReady,
-        login,
-        logout,
-        refreshSession,
-        fetchWithAuth,
-      }}
-    >
+<AuthContext.Provider
+  value={{
+    user,
+    isAuthenticated: !!user,
+    isReady,
+    authError,
+    clearAuthError,
+    login,
+    logout,
+    refreshSession,
+    fetchWithAuth,
+  }}
+>
+
       {children}
     </AuthContext.Provider>
   );

@@ -132,8 +132,6 @@ export default function AddUserDialog({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl p-8 sm:p-10">
         {" "}
-        {/* LEBARKAN POP-UP */}
-        {/* Header yang Lebih Berkesan */}
         <DialogHeader className="pb-4 border-b border-gray-200">
           <DialogTitle className="text-2xl font-bold text-gray-800">
             Tambah Pengguna Baru

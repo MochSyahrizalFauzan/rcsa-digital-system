@@ -14,21 +14,21 @@ export default function SettingPage() {
       label: "Users",
       path: "/setting/user",
     },
-    // {
-    //   icon: <Shield size={50} className="text-indigo-600" />,
-    //   label: "Account",
-    //   path: "/setting/account",
-    // },
-    // {
-    //   icon: <Crown size={50} className="text-yellow-500" />,
-    //   label: "Plans & Billings",
-    //   path: "/setting/plans",
-    // },
-    // {
-    //   icon: <FileText size={50} className="text-indigo-600" />,
-    //   label: "Audit Log",
-    //   path: "/setting/audit",
-    // },
+    {
+      icon: <Shield size={50} className="text-indigo-600" />,
+      label: "Account",
+      path: "/setting/account",
+    },
+    {
+      icon: <Crown size={50} className="text-yellow-500" />,
+      label: "Plans & Billings",
+      path: "/setting/plans",
+    },
+    {
+      icon: <FileText size={50} className="text-indigo-600" />,
+      label: "Audit Log",
+      path: "/setting/audit",
+    },
   ];
 
   return (

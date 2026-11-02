@@ -9,7 +9,7 @@ import Image from "next/image";
 
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, authError, clearAuthError } = useAuth();
   const [user_id, setUserId] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -21,12 +21,13 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError("");
+    clearAuthError();
 
     const ok = await login(user_id, password);
     if (ok) {
       router.push("/rcsa");
     } else {
-      setError("ID USER atau PASSWORD salah");
+      setError(authError || "Login gagal");
     }
 
     setLoading(false);
@@ -129,16 +130,16 @@ export default function LoginPage() {
               disabled={loading}
               className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-4 rounded-full border border-blue-700 shadow-xl hover:bg-blue-700 disabled:opacity-70 disabled:cursor-not-allowed transition font-semibold text-lg uppercase tracking-wide" // Shadow lebih kuat, text uppercase
             >
-              {loading ? "Signing in..." : "Sign In"}
+              {loading ? "Signing in..." : "Log in"}
               {!loading && <ArrowRight size={20} />}
             </motion.button>
           </form>
 
-          <div className="mt-8 text-sm text-center">
-            <a href="/forgot-password" className="text-blue-600 hover:text-blue-800 hover:underline transition font-medium"> {/* Warna text link */}
+          {/* <div className="mt-8 text-sm text-center">
+            <a href="/forgot-password" className="text-blue-600 hover:text-blue-800 hover:underline transition font-medium">
               Lupa Kata Sandi?
             </a>
-          </div>
+          </div> */}
         </motion.div>
       </div>
     </div>

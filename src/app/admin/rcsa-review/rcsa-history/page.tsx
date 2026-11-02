@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 type ReviewItem = {
   assessment_id: number;
@@ -20,7 +23,7 @@ export default function RcsaReviewPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("http://localhost:5000/rcsa/assessment/mine-reviewed", {
+    fetch("http://localhost:5000/rcsa/assessment/reviewed", {
       credentials: "include",
     })
       .then(async (res) => {
@@ -41,8 +44,16 @@ export default function RcsaReviewPage() {
 
   return (
     <div className="p-6 space-y-4">
-      <h1 className="text-2xl font-bold">Riwayat Review RCSA</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Riwayat Review RCSA</h1>
 
+        <Button asChild size="sm" className="gap-2">
+          <Link href="/admin/rcsa-review">
+            <ArrowLeft className="h-4 w-4" />
+            Kembali ke Review
+          </Link>
+        </Button>
+      </div>
       {data.length === 0 && (
         <p className="text-muted-foreground">
           Belum ada assessment yang direview (status reviewed).
@@ -61,7 +72,11 @@ export default function RcsaReviewPage() {
             </div>
 
             {r.decision ? (
-              <Badge className={r.decision === "approved" ? "bg-green-600" : "bg-red-600"}>
+              <Badge
+                className={
+                  r.decision === "approved" ? "bg-green-600" : "bg-red-600"
+                }
+              >
                 {r.decision.toUpperCase()}
               </Badge>
             ) : (

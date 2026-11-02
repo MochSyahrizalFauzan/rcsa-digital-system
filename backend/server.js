@@ -56,7 +56,6 @@ async function assertMasterPublishedForUnit(db, rcsa_master_id, unit_id) {
 }
 
 
-
 // ======== USERS =============
 
 // Ambil semua user + role + unit + permissions
@@ -104,6 +103,61 @@ app.post('/users', async (req, res) => {
 
   res.json({ message: 'User berhasil ditambahkan' });
 });
+
+// Update status user (active/inactive) + proteksi
+app.put("/users/:id/status", authenticateToken(db), async (req, res) => {
+  try {
+    const targetId = Number(req.params.id);
+    const { status } = req.body;
+
+    if (!status || !["active", "inactive"].includes(status)) {
+      return res.status(400).json({ message: "Status tidak valid. Gunakan 'active' atau 'inactive'." });
+    }
+
+    const currentUserId = Number(req.user?.id);
+
+    // 1) Tidak boleh nonaktifkan akun sendiri yang sedang login
+    if (targetId === currentUserId) {
+      return res.status(403).json({ message: "Tidak bisa menonaktifkan akun sendiri saat sedang login." });
+    }
+
+    // Ambil target user untuk cek role
+    const [rows] = await db.execute(
+      `SELECT u.id, u.status, r.role_name
+       FROM users u
+       LEFT JOIN roles r ON u.role_id = r.id
+       WHERE u.id = ?`,
+      [targetId]
+    );
+
+    if (!rows.length) return res.status(404).json({ message: "User tidak ditemukan" });
+
+    const targetUser = rows[0];
+
+    // 2) Jangan izinkan nonaktifkan role pengelola user (Project Manager)
+    const protectedRoles = new Set(["Project Manager"]);
+    if (protectedRoles.has(targetUser.role_name)) {
+      return res.status(403).json({ message: "User dengan role Project Manager tidak boleh dinonaktifkan." });
+    }
+
+    const [result] = await db.execute(
+      `UPDATE users SET status = ? WHERE id = ?`,
+      [status, targetId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "User tidak ditemukan" });
+    }
+
+    res.json({ message: "Status user berhasil diperbarui", id: targetId, status });
+  } catch (err) {
+    console.error("Update status error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
+
 
 // =======================================================
 // ROLES + PERMISSIONS
@@ -167,15 +221,13 @@ app.get("/me", authenticateToken(db), attachPermissions(db), async (req, res) =>
       unit_id: user.unit_id,
       unit_name: user.unit_name,
       status: user.status,
-      permissions: req.perms, // ✅ dari middleware
+      permissions: req.perms, // dari middleware
     });
   } catch (err) {
     console.error("❌ Error /me:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
-
-
 
 
 // ===========================================================
@@ -200,6 +252,18 @@ app.post("/login", async (req, res) => {
       return res.status(401).json({ message: "ID User tidak ditemukan" });
 
     const user = rows[0];
+    // BLOKIR AKUN NONAKTIF
+    if (user.status !== "active") {
+      await db.execute(
+        `INSERT INTO user_logins (user_id, ip_address, user_agent, success, role_name, unit_name)
+        VALUES (?, ?, ?, 0, ?, ?)`,
+        [user.id, req.ip, req.get("User-Agent"), user.role_name, user.unit_name]
+      );
+
+      return res.status(403).json({ message: "Akun Anda nonaktif. Hubungi Project Manager." });
+    }
+
+
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
@@ -1301,10 +1365,12 @@ app.get("/rcsa/assessment", authenticateToken(db), async (req, res) => {
   }
   });
 
-  // ======== USER: RIWAYAT ASSESSMENT YANG SUDAH DIREVIEW ========
-  app.get("/rcsa/assessment/mine-reviewed", authenticateToken(db), async (req, res) => {
-    const userId = req.user.id;
-  
+  // ======== Admin: RIWAYAT ASSESSMENT YANG SUDAH DIREVIEW ========
+  app.get("/rcsa/assessment/reviewed",
+  authenticateToken(db),
+  attachPermissions(db),
+  authorizePerm("can_read"),
+  async (req, res) => {
     try {
       const [rows] = await db.execute(
         `
@@ -1312,16 +1378,22 @@ app.get("/rcsa/assessment", authenticateToken(db), async (req, res) => {
           ra.id AS assessment_id,
           ra.potensi_risiko,
           u.unit_name,
-      
+          u.unit_type,
+          ra.created_at,
+          ra.updated_at,
+
+          ra.created_by AS created_by_user_id,
+          cu.name AS created_by_name,
+
           rn.decision,
           rn.note,
           rn.created_at AS reviewed_at,
           rv.name AS reviewer_name
-      
+
         FROM rcsa_assessment ra
         JOIN units u ON u.id = ra.unit_id
-      
-        -- ambil NOTE TERBARU untuk assessment ini
+        LEFT JOIN users cu ON cu.id = ra.created_by
+
         LEFT JOIN rcsa_review_notes rn
           ON rn.id = (
             SELECT rn2.id
@@ -1330,23 +1402,22 @@ app.get("/rcsa/assessment", authenticateToken(db), async (req, res) => {
             ORDER BY rn2.created_at DESC
             LIMIT 1
           )
-      
+
         LEFT JOIN users rv ON rv.id = rn.reviewer_id
-      
-        WHERE ra.created_by = ?
-          AND ra.status = 'reviewed'
-      
+
+        WHERE ra.status = 'reviewed'
         ORDER BY ra.updated_at DESC
-        `,
-        [userId]
+        `
       );
-    
+
       res.json(rows);
     } catch (err) {
-      console.error("GET /rcsa/assessment/mine-reviewed error:", err);
+      console.error("GET /rcsa/assessment/reviewed error:", err);
       res.status(500).json({ message: "Gagal ambil riwayat reviewed" });
     }
-  });
+  }
+);
+
 
 // ======== ADMIN REPORT: semua assessment yg status reviewed + keputusan terakhir ========
 app.get(
@@ -1404,9 +1475,8 @@ app.get(
 );
 
 
-
-// Ambil detail assessment by ID
-app.get('/rcsa/assessment/:id', async (req, res) => {
+// Ambil detail assessment by ID (HANYA ANGKA)
+app.get('/rcsa/assessment/:id(\\d+)', authenticateToken(db), async (req, res) => {
   const { id } = req.params;
   try {
     const [rows] = await db.execute(`
@@ -1426,67 +1496,14 @@ app.get('/rcsa/assessment/:id', async (req, res) => {
       return res.status(404).json({ message: "Assessment tidak ditemukan" });
     }
 
-    const r = rows[0];
-    const [notes] = await db.execute(`
-      SELECT rn.id, rn.note, rn.created_at, u.id AS reviewer_id, u.name AS reviewer_name
-      FROM rcsa_review_notes rn
-      JOIN users u ON rn.reviewer_id = u.id
-      WHERE rn.assessment_id = ?
-    `, [id]);
-
-    const formatted = {
-      id: r.id,
-      status: r.status,
-      created_at: r.created_at,
-      updated_at: r.updated_at,
-      rcsa_master: {
-        id: r.master_id,
-        rcsa_name: r.rcsa_name,
-        description: r.master_desc
-      },
-      unit: {
-        id: r.unit_id,
-        unit_name: r.unit_name,
-        unit_type: r.unit_type
-      },
-      created_by: {
-        id: r.user_id,
-        name: r.user_name,
-        email: r.user_email
-      },
-      assessment: {
-        jenis_risiko: r.jenis_risiko,
-        risk_description: r.risk_description,
-        penyebab_risiko: r.penyebab_risiko,
-        dampak_inheren: r.dampak_inheren,
-        frekuensi_inheren: r.frekuensi_inheren,
-        nilai_inheren: r.nilai_inheren,
-        level_inheren: r.level_inheren,
-        pengendalian: r.pengendalian,
-        dampak_residual: r.dampak_residual,
-        kemungkinan_residual: r.kemungkinan_residual,
-        nilai_residual: r.nilai_residual,
-        level_residual: r.level_residual,
-        action_plan: r.action_plan,
-        pic: r.pic
-      },
-      review_notes: notes.map(n => ({
-        id: n.id,
-        note: n.note,
-        created_at: n.created_at,
-        reviewer: {
-          id: n.reviewer_id,
-          name: n.reviewer_name
-        }
-      }))
-    };
-
-    res.json({ success: true, data: formatted });
+    // ... lanjutkan kode kamu
+    res.json({ success: true, data: rows[0] });
   } catch (err) {
     console.error("❌ Error ambil detail assessment:", err);
     res.status(500).json({ message: 'Gagal ambil detail assessment' });
   }
 });
+
 
 // Update assessment draft
 app.put("/rcsa/assessment/:id", authenticateToken(db), async (req, res) => {
@@ -1877,10 +1894,371 @@ app.get(
   }
 );
 
+// ======== USER: ARCHIVE (ASSESSMENT MILIK USER YANG SUDAH DIREVIEW) ========
+app.get("/rcsa/assessment/mine-reviewed", authenticateToken(db), attachPermissions(db), async (req, res) => {
+  const userId = req.user.id;
 
+  try {
+    const [rows] = await db.execute(
+      `
+      SELECT
+        ra.id AS id,                     
+        u.unit_name,
+        u.unit_type,
 
+        ra.potensi_risiko,
+        ra.jenis_risiko,
+        ra.penyebab_risiko,
+        ra.pengendalian,
+        ra.action_plan,
+        ra.pic,
 
+        ra.dampak_inheren,
+        ra.frekuensi_inheren,
+        (ra.dampak_inheren * ra.frekuensi_inheren) AS nilai_inheren,
+        ra.level_inheren,
 
+        ra.dampak_residual,
+        ra.kemungkinan_residual,
+        (ra.dampak_residual * ra.kemungkinan_residual) AS nilai_residual,
+        ra.level_residual,
+
+        rn.decision,
+        rn.created_at AS reviewed_at
+
+      FROM rcsa_assessment ra
+      JOIN units u ON u.id = ra.unit_id
+
+      -- ambil note TERBARU untuk assessment ini
+      LEFT JOIN rcsa_review_notes rn
+        ON rn.id = (
+          SELECT rn2.id
+          FROM rcsa_review_notes rn2
+          WHERE rn2.assessment_id = ra.id
+          ORDER BY rn2.created_at DESC
+          LIMIT 1
+        )
+
+      WHERE ra.created_by = ?
+        AND ra.status = 'reviewed'
+
+      ORDER BY ra.updated_at DESC
+      `,
+      [userId]
+    );
+
+    res.json(rows);
+  } catch (err) {
+    console.error("GET /rcsa/assessment/mine-reviewed error:", err);
+    res.status(500).json({ message: "Gagal ambil arsip reviewed" });
+  }
+});
+
+// ======== DASHBOARD SUMMARY =========
+app.get(
+  "/dashboard/summary",
+  authenticateToken(db),
+  attachPermissions(db),
+  async (req, res) => {
+    try {
+      if (!req.perms?.can_read) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      // 1) master stats
+      const [masterStats] = await db.execute(`
+        SELECT status, COUNT(*) AS cnt
+        FROM rcsa_master
+        GROUP BY status
+      `);
+
+      // 2) assessment stats (raw count rows)
+      const [assessmentStatsRows] = await db.execute(`
+        SELECT
+          SUM(CASE WHEN status='draft' THEN 1 ELSE 0 END) AS draft,
+          SUM(CASE WHEN status='submitted' THEN 1 ELSE 0 END) AS submitted,
+          SUM(CASE WHEN status='reviewed' THEN 1 ELSE 0 END) AS reviewed
+        FROM rcsa_assessment
+      `);
+      const assessmentStats = assessmentStatsRows?.[0] || {
+        draft: 0,
+        submitted: 0,
+        reviewed: 0,
+      };
+
+      // 3) Coverage untuk master published + mapping aktif:
+      //    - submitted/reviewed per (master, unit) dihitung "done" kalau ada minimal 1 row
+      //    - draft kalau tidak done tapi ada draft minimal 1
+      //    - missing kalau tidak ada row sama sekali
+      const [coverageRows] = await db.execute(`
+        SELECT
+          COUNT(*) AS total_assignments,
+
+          SUM(CASE WHEN subq.has_submitted = 1 THEN 1 ELSE 0 END) AS done,
+          SUM(CASE WHEN subq.has_submitted = 0 AND subq.has_draft = 1 THEN 1 ELSE 0 END) AS draft,
+          SUM(CASE WHEN subq.has_any = 0 THEN 1 ELSE 0 END) AS missing
+
+        FROM (
+          SELECT
+            mu.rcsa_master_id,
+            mu.unit_id,
+
+            EXISTS(
+              SELECT 1
+              FROM rcsa_assessment ra
+              WHERE ra.rcsa_master_id = mu.rcsa_master_id
+                AND ra.unit_id = mu.unit_id
+                AND ra.status IN ('submitted','reviewed')
+              LIMIT 1
+            ) AS has_submitted,
+
+            EXISTS(
+              SELECT 1
+              FROM rcsa_assessment ra
+              WHERE ra.rcsa_master_id = mu.rcsa_master_id
+                AND ra.unit_id = mu.unit_id
+                AND ra.status = 'draft'
+              LIMIT 1
+            ) AS has_draft,
+
+            EXISTS(
+              SELECT 1
+              FROM rcsa_assessment ra
+              WHERE ra.rcsa_master_id = mu.rcsa_master_id
+                AND ra.unit_id = mu.unit_id
+              LIMIT 1
+            ) AS has_any
+
+          FROM rcsa_master_units mu
+          JOIN rcsa_master m ON m.id = mu.rcsa_master_id
+          WHERE mu.is_active = 1
+            AND m.status = 'published'
+        ) subq
+      `);
+      const coverage = coverageRows?.[0] || {
+        total_assignments: 0,
+        done: 0,
+        draft: 0,
+        missing: 0,
+      };
+
+      // 4) Missing per master + list unit yang belum submit
+      const [missingByMaster] = await db.execute(`
+        SELECT
+          m.id AS master_id,
+          m.rcsa_name,
+          m.created_at,
+          COUNT(mu.unit_id) AS assigned_units,
+
+          SUM(
+            CASE
+              WHEN EXISTS(
+                SELECT 1 FROM rcsa_assessment ra
+                WHERE ra.rcsa_master_id = m.id
+                  AND ra.unit_id = mu.unit_id
+                  AND ra.status IN ('submitted','reviewed')
+                LIMIT 1
+              ) THEN 1 ELSE 0
+            END
+          ) AS submitted_units,
+
+          SUM(
+            CASE
+              WHEN NOT EXISTS(
+                SELECT 1 FROM rcsa_assessment ra
+                WHERE ra.rcsa_master_id = m.id
+                  AND ra.unit_id = mu.unit_id
+                  AND ra.status IN ('submitted','reviewed')
+                LIMIT 1
+              )
+              AND EXISTS(
+                SELECT 1 FROM rcsa_assessment ra
+                WHERE ra.rcsa_master_id = m.id
+                  AND ra.unit_id = mu.unit_id
+                  AND ra.status = 'draft'
+                LIMIT 1
+              ) THEN 1 ELSE 0
+            END
+          ) AS draft_units,
+
+          SUM(
+            CASE
+              WHEN EXISTS(
+                SELECT 1 FROM rcsa_assessment ra
+                WHERE ra.rcsa_master_id = m.id
+                  AND ra.unit_id = mu.unit_id
+                LIMIT 1
+              ) THEN 0 ELSE 1
+            END
+          ) AS missing_units,
+
+          GROUP_CONCAT(
+            CASE
+              WHEN NOT EXISTS(
+                SELECT 1 FROM rcsa_assessment ra
+                WHERE ra.rcsa_master_id = m.id
+                  AND ra.unit_id = mu.unit_id
+                  AND ra.status IN ('submitted','reviewed')
+                LIMIT 1
+              )
+              THEN u.unit_name
+            END
+            ORDER BY u.unit_name SEPARATOR ', '
+          ) AS not_submitted_unit_names
+
+        FROM rcsa_master m
+        JOIN rcsa_master_units mu ON mu.rcsa_master_id = m.id AND mu.is_active = 1
+        JOIN units u ON u.id = mu.unit_id
+        WHERE m.status = 'published'
+        GROUP BY m.id, m.rcsa_name, m.created_at
+        ORDER BY missing_units DESC, m.created_at DESC
+        LIMIT 20
+      `);
+
+      // 5) Progress per unit (ranking unit yang paling banyak belum submit)
+      const [unitProgress] = await db.execute(`
+        SELECT
+          u.id AS unit_id,
+          u.unit_name,
+          u.unit_type,
+
+          COUNT(mu.rcsa_master_id) AS assigned_masters,
+
+          SUM(
+            CASE
+              WHEN EXISTS(
+                SELECT 1 FROM rcsa_assessment ra
+                WHERE ra.rcsa_master_id = mu.rcsa_master_id
+                  AND ra.unit_id = u.id
+                  AND ra.status IN ('submitted','reviewed')
+                LIMIT 1
+              ) THEN 1 ELSE 0
+            END
+          ) AS submitted,
+
+          SUM(
+            CASE
+              WHEN NOT EXISTS(
+                SELECT 1 FROM rcsa_assessment ra
+                WHERE ra.rcsa_master_id = mu.rcsa_master_id
+                  AND ra.unit_id = u.id
+                  AND ra.status IN ('submitted','reviewed')
+                LIMIT 1
+              )
+              AND EXISTS(
+                SELECT 1 FROM rcsa_assessment ra
+                WHERE ra.rcsa_master_id = mu.rcsa_master_id
+                  AND ra.unit_id = u.id
+                  AND ra.status = 'draft'
+                LIMIT 1
+              ) THEN 1 ELSE 0
+            END
+          ) AS draft,
+
+          SUM(
+            CASE
+              WHEN EXISTS(
+                SELECT 1 FROM rcsa_assessment ra
+                WHERE ra.rcsa_master_id = mu.rcsa_master_id
+                  AND ra.unit_id = u.id
+                LIMIT 1
+              ) THEN 0 ELSE 1
+            END
+          ) AS missing
+
+        FROM units u
+        JOIN rcsa_master_units mu
+          ON mu.unit_id = u.id
+         AND mu.is_active = 1
+
+        JOIN rcsa_master m
+          ON m.id = mu.rcsa_master_id
+         AND m.status = 'published'
+
+        GROUP BY u.id, u.unit_name, u.unit_type
+        ORDER BY missing DESC, u.unit_name ASC
+        LIMIT 20
+      `);
+
+      // 6) recent logins
+      const [recentLogins] = await db.execute(`
+        SELECT 
+          ul.id,
+          ul.user_id,
+          u.name AS user_name,
+          ul.login_time,
+          ul.logout_time,
+          ul.ip_address,
+          ul.user_agent,
+          ul.role_name,
+          ul.unit_name,
+          u.status
+        FROM user_logins ul
+        JOIN users u ON ul.user_id = u.id
+        ORDER BY ul.login_time DESC
+        LIMIT 10
+      `);
+
+      // 7) queues (only if can_approve)
+      let approvalInbox = [];
+      let reviewQueue = [];
+      if (req.perms?.can_approve) {
+        const [a] = await db.execute(`
+          SELECT
+            a.id AS approval_id,
+            m.id,
+            m.rcsa_name,
+            m.description,
+            m.status,
+            m.created_at,
+            u.name AS created_by_name,
+            a.step_order,
+            a.approver_user_id
+          FROM rcsa_master m
+          JOIN rcsa_master_approvals a ON a.rcsa_master_id = m.id
+          LEFT JOIN users u ON u.id = m.created_by
+          WHERE m.status='pending_approval'
+            AND a.decision='pending'
+          ORDER BY m.created_at DESC
+          LIMIT 20
+        `);
+        approvalInbox = a;
+
+        const [rq] = await db.execute(`
+          SELECT 
+            ra.id,
+            ra.status,
+            ra.updated_at,
+            ra.potensi_risiko,
+            un.unit_name,
+            un.unit_type,
+            usr.name AS created_by_name,
+            usr.user_id AS created_by_user_id
+          FROM rcsa_assessment ra
+          JOIN units un ON un.id = ra.unit_id
+          JOIN users usr ON usr.id = ra.created_by
+          WHERE ra.status = 'submitted'
+          ORDER BY ra.updated_at DESC
+          LIMIT 20
+        `);
+        reviewQueue = rq;
+      }
+
+      res.json({
+        masterStats,
+        assessmentStats,
+        coverage,
+        missingByMaster,
+        unitProgress,
+        queues: { approvalInbox, reviewQueue },
+        recent: { logins: recentLogins },
+      });
+    } catch (err) {
+      console.error("GET /dashboard/summary error:", err);
+      res.status(500).json({ message: "Server error dashboard" });
+    }
+  }
+);
 
 
 

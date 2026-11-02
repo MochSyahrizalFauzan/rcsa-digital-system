@@ -28,3 +28,15 @@ export function timeAgo(dateStr?: string | null) {
   const days = Math.floor(hours / 24);
   return `${days} hari yang lalu`;
 }
+
+export function formatDate(dateStr?: string | null) {
+  if (!dateStr) return "-";
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return "-";
+
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  }).format(d);
+}
