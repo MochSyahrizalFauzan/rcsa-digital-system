@@ -10,15 +10,15 @@ Sistem manajemen risiko dan RCSA berbasis Next.js, Express, dan MySQL.
 - Assessment RCSA dengan draft, submit, review, dan histori.
 - Risk register dan master risk.
 - Dashboard monitoring RCSA dan aktivitas login.
-- Integrasi Genkit dengan Google Gemini untuk pengembangan fitur AI risk summary.
+
 
 ## Arsitektur
 
 ```text
 Browser
-  -> Next.js frontend (port 9002)
-  -> Express modular monolith (port 5001)
-  -> MySQL
+  -> Next.js frontend
+  -> Express backend 
+  -> MySQL Databases
 ```
 
 Backend menggunakan pola:
@@ -40,26 +40,24 @@ Module backend berada di [`service/modules`](./service/modules):
 
 - Node.js 20 atau lebih baru.
 - MySQL 8 atau kompatibel.
-- Database `smart_database` beserta tabel aplikasi.
 
 ## Konfigurasi environment
 
-Buat file `.env` di root proyek:
 
 ```env
-DB_HOST=localhost
-DB_USERNAME=root
-DB_PASSWORD=
-DB_NAME=smart_database
-DB_PORT=3306
+DB_HOST=XXXXXXXXXXXX
+DB_USERNAME=XXXXXXXXXX
+DB_PASSWORD=XXXXXXXXXX
+DB_NAME=XXXXXXXXXX
+DB_PORT=XXXXXXX
 
-JWT_SECRET=replace-with-a-long-random-secret
-REFRESH_SECRET=replace-with-a-different-long-random-secret
+JWT_SECRET=XXXXXXXXXXXXXXXXXXXXXXXXXXX
+REFRESH_SECRET=XXXXXXXXXXXXXXXXXXXXXXXXX
 JWT_ACCESS_EXPIRES_IN=1h
 JWT_REFRESH_EXPIRES_IN=7d
 
-REFACTOR_PORT=5001
-NEXT_PUBLIC_API_URL=http://localhost:5001
+REFACTOR_PORT=XXXX
+NEXT_PUBLIC_API_URL=XXXXXXXXXXX
 ```
 
 Jangan commit file `.env` atau secret ke repository.
@@ -71,20 +69,17 @@ npm install
 npm run server:new
 ```
 
-Backend refactor berjalan di `http://localhost:5001`.
-
 Pada terminal lain:
 
 ```bash
 npm run dev
 ```
 
-Frontend berjalan di `http://localhost:9002`.
 
 Endpoint pemeriksaan kesehatan:
 
 ```text
-GET http://localhost:5001/health
+GET http://xxxxxxxxxxxx/health
 ```
 
 Response yang diharapkan:
@@ -101,8 +96,6 @@ Backend lama tersedia untuk kompatibilitas sementara melalui:
 ```bash
 npm run server:old
 ```
-
-Backend lama menggunakan port `5000`; gunakan backend refactor untuk pengembangan utama.
 
 ## Endpoint utama
 
@@ -195,8 +188,4 @@ Get-ChildItem -Recurse -File service -Filter *.js |
   ForEach-Object { node --check $_.FullName }
 ```
 
-Health check hanya memvalidasi aplikasi Express dan koneksi database. Pengujian end-to-end tetap perlu dilakukan menggunakan akun dan data MySQL nyata untuk login, permission, workflow RCSA, dashboard, dan risk register.
-
-## Deployment
-
-Konfigurasi Firebase App Hosting berada di [`apphosting.yaml`](./apphosting.yaml). Secret production harus disediakan melalui environment/secret manager dan tidak menggunakan nilai default.
+Health check hanya memvalidasi aplikasi Express dan koneksi database. Pengujian end-to-end tetap perlu dilakukan menggunakan akun dan data MySQL nyata untuk login, permission, workflow RCSA, dan dashboard.
