@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { API_BASE } from "@/lib/api";
 import {
   Select,
   SelectContent,
@@ -72,8 +73,8 @@ export default function AddUserDialog({
     async function fetchOptions() {
       try {
         const [rolesRes, unitsRes] = await Promise.all([
-          fetch("http://localhost:5000/roles"),
-          fetch("http://localhost:5000/units"),
+          fetch(`${API_BASE}/roles`, { credentials: "include" }),
+          fetch(`${API_BASE}/units`, { credentials: "include" }),
         ]);
 
         const [rolesData, unitsData] = await Promise.all([
@@ -108,9 +109,10 @@ export default function AddUserDialog({
       status: data.status || "active"
     };
 
-    const res = await fetch("http://localhost:5000/users", {
+    const res = await fetch(`${API_BASE}/users`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify(payload),
     });
 

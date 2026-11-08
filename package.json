@@ -11,7 +11,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "server": "node backend/server.js"
+    "server:old": "node service/server.js",
+    "server:new" : "node service/server.refactor.js"
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.14.1",
@@ -45,7 +46,7 @@
     "cmdk": "^1.1.1",
     "cookie-parser": "^1.4.7",
     "date-fns": "^3.6.0",
-    "dotenv": "^16.5.0",
+    "dotenv": "^16.6.1",
     "embla-carousel-react": "^8.6.0",
     "firebase": "^11.9.1",
     "framer-motion": "^12.23.12",
@@ -53,7 +54,7 @@
     "jsonwebtoken": "^9.0.2",
     "jwt-decode": "^4.0.0",
     "lucide-react": "^0.475.0",
-    "mysql2": "^3.14.3",
+    "mysql2": "^3.24.6",
     "next": "^15.5.2",
     "nprogress": "^0.2.0",
     "patch-package": "^8.0.0",

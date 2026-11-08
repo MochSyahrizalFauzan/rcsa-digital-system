@@ -124,7 +124,7 @@ export default function UserSettingPage() {
 }
 
 async function fetchUserLogins(fetchWithAuth: any) {
-  const res = await fetchWithAuth("http://localhost:5000/user-logins");
+  const res = await fetchWithAuth("/user-logins");
   if (!res.ok) throw new Error("Gagal mengambil data user_logins");
   return res.json();
 }

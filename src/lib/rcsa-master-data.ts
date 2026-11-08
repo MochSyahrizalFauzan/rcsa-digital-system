@@ -1,4 +1,5 @@
 import { mapMasterToRCSA, RCSAData } from "./rcsa-data";
+import { API_BASE } from "./api";
 
 export type MasterRCSA = {
   id: number;
@@ -7,7 +8,7 @@ export type MasterRCSA = {
   unit_id: number;
 };
 
-const API_URL = "http://localhost:5000";
+const API_URL = API_BASE;
 
 // Ambil master RCSA untuk user tertentu
 export async function getRcsaMasterData(
@@ -45,7 +46,7 @@ export async function createMasterRCSA(data: {
   created_by: number;
 }): Promise<MasterRCSA | null> {
   try {
-    const res = await fetch(`${API_URL}/master-rcsa`, {
+    const res = await fetch(`${API_URL}/rcsa/master`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -77,7 +78,7 @@ export async function updateMasterRCSA(
   data: Partial<Pick<MasterRCSA, "rcsa_name" | "description" | "unit_id">>
 ): Promise<boolean> {
   try {
-    const res = await fetch(`${API_URL}/master-rcsa/${id}`, {
+    const res = await fetch(`${API_URL}/rcsa/master/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -99,7 +100,7 @@ export async function updateMasterRCSA(
 // Hapus data master RCSA
 export async function deleteMasterRCSA(id: number): Promise<boolean> {
   try {
-    const res = await fetch(`${API_URL}/master-rcsa/${id}`, {
+    const res = await fetch(`${API_URL}/rcsa/master/${id}`, {
       method: "DELETE",
       credentials: "include", 
     });

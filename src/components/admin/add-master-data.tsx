@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import type { RCSAData } from '@/lib/rcsa-data';
+import { API_BASE } from '@/lib/api';
 import { createMasterRCSA } from '@/lib/rcsa-master-data';
 import { SearchableSelect } from "@/components/ui/searchable-select";
 
@@ -52,7 +53,7 @@ export function AddMasterDataModal({
 
   // Ambil daftar parent (unit dengan parent_id = null)
   useEffect(() => {
-    fetch("http://localhost:5000/units?parent_id=null")
+    fetch(`${API_BASE}/units?parent_id=null`, { credentials: "include" })
       .then((res) => res.json())
       .then((data) => {
         setParents(data);
@@ -69,7 +70,7 @@ export function AddMasterDataModal({
 
     const parentId = Number(selectedParent);
 
-    fetch(`http://localhost:5000/units?parent_id=${parentId}`)
+    fetch(`${API_BASE}/units?parent_id=${parentId}`, { credentials: "include" })
       .then((res) => res.json())
       .then((data) => {
         // Jangan tampilkan parent lagi di dropdown anak
@@ -108,7 +109,9 @@ export function AddMasterDataModal({
         const selectedUnit = [...parents, ...children].find((u) => u.id === unitId);
         onSave({
           id: newMaster.id,
+          rcsa_master_id: newMaster.id,
           unit_id: newMaster.unit_id,
+          status: "draft",
           potensiRisiko,
           keteranganAdmin: keterangan,
           keteranganUser: "",

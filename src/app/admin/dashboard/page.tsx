@@ -220,7 +220,7 @@ export default function AdminDashboardPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetchWithAuth("http://localhost:5000/dashboard/summary", {
+      const res = await fetchWithAuth("/dashboard/summary", {
         method: "GET",
       });
 

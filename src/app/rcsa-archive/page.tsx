@@ -97,7 +97,7 @@ export default function RcsaArchivePage() {
     try {
       setLoading(true);
 
-      const res = await fetchWithAuth("http://localhost:5000/rcsa/assessment/mine-reviewed", {
+      const res = await fetchWithAuth("/rcsa/assessment/mine-reviewed", {
         method: "GET",
       });
 

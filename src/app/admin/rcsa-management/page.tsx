@@ -302,7 +302,7 @@ export default function RcsaMasterAdminPage() {
   const onDelete = async (row: MasterRow) => {
     try {
       setSaving(true);
-      await api(`/master-rcsa/${row.id}`, { method: "DELETE" });
+      await api(`/rcsa/master/${row.id}`, { method: "DELETE" });
       toast({ title: "Dihapus", description: "Master dihapus" });
       await load();
     } catch (err: any) {

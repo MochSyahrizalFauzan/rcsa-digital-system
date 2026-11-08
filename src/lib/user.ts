@@ -1,5 +1,7 @@
+import { API_BASE } from "./api";
+
 export async function fetchUsersWithAuth(fetchWithAuth: any) {
-  const res = await fetchWithAuth("http://localhost:5000/users", {
+  const res = await fetchWithAuth(`${API_BASE}/users`, {
     method: "GET",
   });
 

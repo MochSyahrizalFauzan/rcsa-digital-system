@@ -23,7 +23,7 @@ export default function RcsaReviewPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("http://localhost:5000/rcsa/assessment/reviewed", {
+    fetch("/rcsa/assessment/reviewed", {
       credentials: "include",
     })
       .then(async (res) => {

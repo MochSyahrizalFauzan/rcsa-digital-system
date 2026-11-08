@@ -26,7 +26,9 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/context/auth-context";
 import { RiskTable } from "@/components/rcsa/RcsaTable";
 
-const UNIT_API_URL = "http://localhost:5000/units";
+import { API_BASE } from "@/lib/api";
+
+const UNIT_API_URL = `${API_BASE}/units`;
 const DEBOUNCE_MS = 800;
 
 // Key stabil untuk row (draft awal sering belum punya id DB)
@@ -78,7 +80,7 @@ export default function Rcsapage() {
             ...r,
             no: r.no ?? idx + 1,
             unit_id: r.unit_id ?? user.unit_id!,
-            status: (r.status ?? "draft") as const,
+            status: (r.status ?? "draft") as "draft" | "submitted" | "reviewed",
           };
           latestRowsRef.current.set(getRowKey(row), row);
           return row;
@@ -212,7 +214,7 @@ export default function Rcsapage() {
 
   // ====== INPUT CHANGE + DEBOUNCE AUTOSAVE ======
   const handleInputChange = useCallback(
-    (index: number, field: keyof Omit<RCSAData, "no">, value: any) => {
+    (index: number, field: keyof RCSAData, value: any) => {
       if (!user) return;
 
       setData((prev) => {
