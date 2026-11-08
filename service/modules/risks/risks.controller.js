@@ -5,8 +5,20 @@ const createRisksController = (risksService) => {
      */
     getAllRisks: async (req, res, next) => {
       try {
-        const rows = await risksService.getAllRisks();
+        const rows = await risksService.getAllRisks(req.user, req.perms);
         return res.status(200).json(rows);
+      } catch (error) {
+        next(error);
+      }
+    },
+
+    /**
+     * GET /risks/:id
+     */
+    getRiskById: async (req, res, next) => {
+      try {
+        const risk = await risksService.getRiskById(req.params.id, req.user, req.perms);
+        return res.status(200).json(risk);
       } catch (error) {
         next(error);
       }
@@ -17,7 +29,7 @@ const createRisksController = (risksService) => {
      */
     createRisk: async (req, res, next) => {
       try {
-        const result = await risksService.createRisk(req.body);
+        const result = await risksService.createRisk(req.body, req.user, req.perms);
         return res.status(200).json(result);
       } catch (error) {
         next(error);
@@ -29,7 +41,7 @@ const createRisksController = (risksService) => {
      */
     updateRisk: async (req, res, next) => {
       try {
-        const result = await risksService.updateRisk(req.params.id, req.body);
+        const result = await risksService.updateRisk(req.params.id, req.body, req.user, req.perms);
         return res.status(200).json(result);
       } catch (error) {
         next(error);
@@ -41,7 +53,7 @@ const createRisksController = (risksService) => {
      */
     deleteRisk: async (req, res, next) => {
       try {
-        const result = await risksService.deleteRisk(req.params.id);
+        const result = await risksService.deleteRisk(req.params.id, req.user, req.perms);
         return res.status(200).json(result);
       } catch (error) {
         next(error);
@@ -78,7 +90,13 @@ const createRisksController = (risksService) => {
     generateRisk: async (req, res, next) => {
       try {
         const { master_id, target_unit_id, pemilik_risiko } = req.body;
-        const result = await risksService.generateRiskForUnit(master_id, target_unit_id, pemilik_risiko);
+        const result = await risksService.generateRiskForUnit(
+          master_id,
+          target_unit_id,
+          pemilik_risiko,
+          req.user,
+          req.perms
+        );
         return res.status(200).json(result);
       } catch (error) {
         next(error);

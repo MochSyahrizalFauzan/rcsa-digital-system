@@ -6,7 +6,7 @@ const createRcsaAssessmentController = (rcsaAssessmentService) => {
     getSubmitted: async (req, res, next) => {
       try {
         const { unit_id } = req.query;
-        const rows = await rcsaAssessmentService.getSubmitted(unit_id);
+        const rows = await rcsaAssessmentService.getSubmitted(unit_id, req.user, req.perms);
         return res.status(200).json(rows);
       } catch (error) {
         next(error);
@@ -25,7 +25,8 @@ const createRcsaAssessmentController = (rcsaAssessmentService) => {
             excludeSubmitted: exclude_submitted,
             incompleteOnly: incomplete_only,
           },
-          req.user.id
+          req.user,
+          req.perms
         );
         return res.status(200).json(rows);
       } catch (error) {
@@ -38,7 +39,7 @@ const createRcsaAssessmentController = (rcsaAssessmentService) => {
      */
     getById: async (req, res, next) => {
       try {
-        const data = await rcsaAssessmentService.getById(req.params.id);
+        const data = await rcsaAssessmentService.getById(req.params.id, req.user, req.perms);
         return res.status(200).json({ success: true, data });
       } catch (error) {
         next(error);
@@ -50,7 +51,7 @@ const createRcsaAssessmentController = (rcsaAssessmentService) => {
      */
     saveAssessment: async (req, res, next) => {
       try {
-        const result = await rcsaAssessmentService.saveAssessment(req.body, req.user.id);
+        const result = await rcsaAssessmentService.saveAssessment(req.body, req.user, req.perms);
         return res.status(200).json(result);
       } catch (error) {
         next(error);
@@ -139,7 +140,7 @@ const createRcsaAssessmentController = (rcsaAssessmentService) => {
     getReportReviewed: async (req, res, next) => {
       try {
         const { unit_id } = req.query;
-        const rows = await rcsaAssessmentService.getReportReviewed(unit_id);
+        const rows = await rcsaAssessmentService.getReportReviewed(unit_id, req.user, req.perms);
         return res.status(200).json(rows);
       } catch (error) {
         next(error);

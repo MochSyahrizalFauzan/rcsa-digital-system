@@ -1,24 +1,33 @@
 import { AppError } from "../../middleware/error.js";
 
 const createRcsaAssessmentService = (rcsaAssessmentRepository) => {
+  const canAccessUnit = (user, permissions, unitId) =>
+    permissions?.can_approve ||
+    permissions?.can_provision ||
+    Number(user?.unit_id) === Number(unitId);
+
   return {
     /**
      * Get submitted assessments list
      */
-    getSubmitted: async (unitId) => {
-      return await rcsaAssessmentRepository.findSubmitted(unitId);
+    getSubmitted: async (unitId, user, permissions) => {
+      const scopedUnitId = canAccessUnit(user, permissions, unitId) ? unitId : user.unit_id;
+      return await rcsaAssessmentRepository.findSubmitted(scopedUnitId);
     },
 
     /**
      * Get draft assessments matrix for unit
      */
-    getDrafts: async ({ unitId, excludeSubmitted, incompleteOnly }, userId) => {
+    getDrafts: async ({ unitId, excludeSubmitted, incompleteOnly }, user, permissions) => {
       if (!unitId) {
         throw new AppError("Parameter unit_id wajib disertakan", 400);
       }
+      if (!canAccessUnit(user, permissions, unitId)) {
+        unitId = user.unit_id;
+      }
       return await rcsaAssessmentRepository.findDrafts({
         unitId,
-        userId,
+        userId: user.id,
         excludeSubmitted,
         incompleteOnly,
       });
@@ -27,7 +36,7 @@ const createRcsaAssessmentService = (rcsaAssessmentRepository) => {
     /**
      * Get assessment detail by ID
      */
-    getById: async (id) => {
+    getById: async (id, user, permissions) => {
       const numericId = Number(id);
       if (!numericId) {
         throw new AppError("ID Assessment tidak valid", 400);
@@ -36,15 +45,26 @@ const createRcsaAssessmentService = (rcsaAssessmentRepository) => {
       if (!assessment) {
         throw new AppError("Assessment tidak ditemukan", 404);
       }
+      if (
+        !permissions?.can_approve &&
+        !permissions?.can_provision &&
+        assessment.created_by !== user.id &&
+        Number(assessment.unit_id) !== Number(user.unit_id)
+      ) {
+        throw new AppError("Forbidden: assessment berada di luar unit Anda", 403);
+      }
       return assessment;
     },
 
     /**
      * Save (upsert) assessment draft
      */
-    saveAssessment: async (data, userId) => {
+    saveAssessment: async (data, user, permissions) => {
       if (!data.rcsa_master_id || !data.unit_id) {
         throw new AppError("rcsa_master_id dan unit_id wajib disertakan", 400);
+      }
+      if (!canAccessUnit(user, permissions, data.unit_id)) {
+        throw new AppError("Forbidden: assessment hanya dapat dibuat untuk unit Anda", 403);
       }
 
       // 1. Verifikasi Master Published & Aktif untuk Unit
@@ -59,25 +79,11 @@ const createRcsaAssessmentService = (rcsaAssessmentRepository) => {
         );
       }
 
-      const existing = await rcsaAssessmentRepository.findExistingByUserAndMaster(
-        data.rcsa_master_id,
-        data.unit_id,
-        userId
-      );
-
-      // Jika draft sudah ada
-      if (existing) {
-        if (existing.status === "submitted") {
-          throw new AppError("Assessment sudah submitted, tidak bisa membuat draft baru.", 400);
-        }
-
-        await rcsaAssessmentRepository.updateAssessment(existing.id, data);
-        return { ...data, id: existing.id, status: "draft" };
+      const assessment = await rcsaAssessmentRepository.upsertAssessment(data, user.id);
+      if (assessment.status === "submitted") {
+        throw new AppError("Assessment sudah submitted, tidak bisa membuat draft baru.", 400);
       }
-
-      // Jika belum ada, lakukan INSERT baru
-      const newId = await rcsaAssessmentRepository.insertAssessment(data, userId);
-      return { ...data, id: newId, status: "draft" };
+      return { ...data, id: assessment.id, status: assessment.status };
     },
 
     /**
@@ -243,8 +249,9 @@ const createRcsaAssessmentService = (rcsaAssessmentRepository) => {
     /**
      * Get report of reviewed assessments
      */
-    getReportReviewed: async (unitId) => {
-      return await rcsaAssessmentRepository.findReportReviewed(unitId);
+    getReportReviewed: async (unitId, user, permissions) => {
+      const scopedUnitId = canAccessUnit(user, permissions, unitId) ? unitId : user.unit_id;
+      return await rcsaAssessmentRepository.findReportReviewed(scopedUnitId);
     },
 
     /**

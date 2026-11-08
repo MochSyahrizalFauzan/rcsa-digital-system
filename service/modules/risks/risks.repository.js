@@ -7,7 +7,9 @@ const createRisksRepository = (db) => {
     /**
      * Retrieve all risks with owner, role, and unit
      */
-    findAll: async () => {
+    findAll: async ({ userId, unitId, includeAll }) => {
+      const scope = includeAll ? "" : "WHERE r.pemilik_risiko = ? OR u.unit_id = ?";
+      const params = includeAll ? [] : [userId, unitId];
       const [rows] = await db.execute(`
         SELECT r.*, rs.role_name AS jabatan, u.unit_id,
               un.unit_name AS unit_kerja, u.name AS pemilik_nama
@@ -15,8 +17,9 @@ const createRisksRepository = (db) => {
         LEFT JOIN users u ON r.pemilik_risiko = u.id
         LEFT JOIN roles rs ON u.role_id = rs.id
         LEFT JOIN units un ON u.unit_id = un.id
+        ${scope}
         ORDER BY r.id DESC
-      `);
+      `, params);
       return rows;
     },
 
@@ -24,7 +27,10 @@ const createRisksRepository = (db) => {
      * Find single risk by ID
      */
     findById: async (id) => {
-      const [rows] = await db.execute(`SELECT * FROM risks WHERE id = ? LIMIT 1`, [id]);
+      const [rows] = await db.execute(      `SELECT r.*, u.unit_id AS owner_unit_id
+       FROM risks r
+       LEFT JOIN users u ON r.pemilik_risiko = u.id
+       WHERE r.id = ? LIMIT 1`, [id]);
       return rows[0] || null;
     },
 

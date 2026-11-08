@@ -75,7 +75,7 @@ const createApp = (db) => {
   const rcsaMasterModule = createRcsaMasterModule(db, authMiddleware, permissionsMiddleware, authorizePerm);
   const rcsaAssessmentModule = createRcsaAssessmentModule(db, authMiddleware, permissionsMiddleware, authorizePerm);
   const dashboardModule = createDashboardModule(db, authMiddleware, permissionsMiddleware, authorizePerm);
-  const risksModule = createRisksModule(db, authMiddleware);
+  const risksModule = createRisksModule(db, authMiddleware, permissionsMiddleware, authorizePerm);
 
   // 5. Mount Module Routes
   app.use("/", authModule.routes);
