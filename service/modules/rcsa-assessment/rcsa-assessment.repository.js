@@ -151,6 +151,40 @@ const createRcsaAssessmentRepository = (db) => {
       return result.insertId;
     },
 
+    upsertAssessment: async (data, userId, conn = db) => {
+      const [result] = await conn.execute(
+        `INSERT INTO rcsa_assessment (${assessmentColumns})
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft')
+         ON DUPLICATE KEY UPDATE
+           jenis_risiko = IF(status = 'submitted', jenis_risiko, VALUES(jenis_risiko)),
+           potensi_risiko = IF(status = 'submitted', potensi_risiko, VALUES(potensi_risiko)),
+           penyebab_risiko = IF(status = 'submitted', penyebab_risiko, VALUES(penyebab_risiko)),
+           dampak_inheren = IF(status = 'submitted', dampak_inheren, VALUES(dampak_inheren)),
+           frekuensi_inheren = IF(status = 'submitted', frekuensi_inheren, VALUES(frekuensi_inheren)),
+           nilai_inheren = IF(status = 'submitted', nilai_inheren, VALUES(nilai_inheren)),
+           level_inheren = IF(status = 'submitted', level_inheren, VALUES(level_inheren)),
+           pengendalian = IF(status = 'submitted', pengendalian, VALUES(pengendalian)),
+           dampak_residual = IF(status = 'submitted', dampak_residual, VALUES(dampak_residual)),
+           kemungkinan_residual = IF(status = 'submitted', kemungkinan_residual, VALUES(kemungkinan_residual)),
+           nilai_residual = IF(status = 'submitted', nilai_residual, VALUES(nilai_residual)),
+           level_residual = IF(status = 'submitted', level_residual, VALUES(level_residual)),
+           action_plan = IF(status = 'submitted', action_plan, VALUES(action_plan)),
+           pic = IF(status = 'submitted', pic, VALUES(pic)),
+           keterangan_user = IF(status = 'submitted', keterangan_user, VALUES(keterangan_user)),
+           status = IF(status = 'submitted', status, 'draft')`,
+        assessmentValues(data, userId)
+      );
+
+      const [rows] = await conn.execute(
+        `SELECT id, status
+         FROM rcsa_assessment
+         WHERE rcsa_master_id = ? AND unit_id = ? AND created_by = ?
+         LIMIT 1`,
+        [data.rcsa_master_id, data.unit_id, userId]
+      );
+      return rows[0] || { id: result.insertId, status: "draft" };
+    },
+
     updateAssessment: async (id, data, conn = db) => {
       await conn.execute(
         `UPDATE rcsa_assessment SET

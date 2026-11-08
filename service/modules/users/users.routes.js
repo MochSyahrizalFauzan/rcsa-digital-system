@@ -21,15 +21,27 @@ const createUsersRoutes = (usersController, authenticateToken, attachPermissions
   );
 
   // Roles & Permissions
-  router.get("/roles", usersController.getAllRoles);
-  router.get("/roles/:roleId/permissions", usersController.getRolePermissions);
+  router.get("/roles", authenticateToken, attachPermissions, authorizePerm("can_read"), usersController.getAllRoles);
+  router.get(
+    "/roles/:roleId/permissions",
+    authenticateToken,
+    attachPermissions,
+    authorizePerm("can_read"),
+    usersController.getRolePermissions
+  );
 
   // User Logins (Audit Trail)
   router.get("/user-logins", authenticateToken, usersController.getUserLogins);
 
   // Units
-  router.get("/units", usersController.getAllUnits);
-  router.get("/units/:id", usersController.getUnitById);
+  router.get("/units", authenticateToken, attachPermissions, authorizePerm("can_read"), usersController.getAllUnits);
+  router.get(
+    "/units/:id",
+    authenticateToken,
+    attachPermissions,
+    authorizePerm("can_read"),
+    usersController.getUnitById
+  );
 
   return router;
 };
