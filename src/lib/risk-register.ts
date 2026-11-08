@@ -1,6 +1,7 @@
 import { useAuth } from "@/context/auth-context";
+import { API_BASE } from "./api";
 
-export const API_URL = "http://localhost:5000";
+export const API_URL = API_BASE;
 
 /* =========================================================
     PAYLOAD BUILDER — FULL INPUT (Semua Kolom)
@@ -158,4 +159,3 @@ export async function generateRiskFromMaster(fetchWithAuth: any, data: any) {
 }
 
 // keep createRisk/updateRisk/deleteRisk as before
-

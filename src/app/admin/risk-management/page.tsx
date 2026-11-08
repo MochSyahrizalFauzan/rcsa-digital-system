@@ -74,6 +74,7 @@ const filteredRisks =
     ? masterOnly
     : masterOnly.filter(
         (r) =>
+          r.pemilik_risiko != null &&
           userDivisionMap[r.pemilik_risiko]?.toLowerCase() ===
           selectedUnit.toLowerCase()
       );

@@ -9,6 +9,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import type { User, UserPermissions } from "@/types/user";
+import { API_BASE } from "@/lib/api";
 
 type AuthContextType = {
   user: User | null;
@@ -48,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Ambil session aktif (user) dari server via cookie
   const fetchSession = useCallback(async () => {
-    const res = await fetch("http://localhost:5000/me", {
+    const res = await fetch(`${API_BASE}/me`, {
       method: "GET",
       credentials: "include",
       cache: "no-store", //  biar gak 304 / cache
@@ -83,7 +84,7 @@ const login = async (user_id: string, password: string) => {
   try {
     setAuthError(null);
 
-    const res = await fetch("http://localhost:5000/login", {
+    const res = await fetch(`${API_BASE}/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -109,7 +110,7 @@ const login = async (user_id: string, password: string) => {
   // Logout → server hapus cookie
   const logout = useCallback(async () => {
     try {
-      await fetch("http://localhost:5000/logout", {
+      await fetch(`${API_BASE}/logout`, {
         method: "POST",
         credentials: "include",
       });
@@ -139,7 +140,9 @@ const login = async (user_id: string, password: string) => {
       headers.set("Content-Type", "application/json");
     }
 
-    return fetch(url, {
+    const requestUrl = url.startsWith("http") ? url : `${API_BASE}${url}`;
+
+    return fetch(requestUrl, {
       ...options,
       credentials: "include",
       cache: "no-store",

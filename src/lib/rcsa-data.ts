@@ -6,14 +6,14 @@ import { toSnakeCase } from "@/lib/utils";
 
 //=================== types =====================
 export type RCSAData = {
-  id: number;
+  id?: number;
   no: number;
 
   rcsa_master_id: number;
   unit_id: number;
-  created_by: number;
+  created_by?: number;
 
-  unit_name: string;
+  unit_name?: string;
   unit_type?: string | null;
 
   potensiRisiko: string | null;
@@ -24,28 +24,29 @@ export type RCSAData = {
 
   dampakInheren: number | null;
   frekuensiInheren: number | null;
-  nilaiInheren: number | null;
-  levelInheren: "Rendah" | "Sedang" | "Tinggi" | "Sangat Tinggi" | null;
+  nilaiInheren?: number | null;
+  levelInheren?: "Rendah" | "Sedang" | "Tinggi" | "Sangat Tinggi" | null;
 
   pengendalian: string | null;
 
   dampakResidual: number | null;
   kemungkinanResidual: number | null;
-  nilaiResidual: number | null;
-  levelResidual: "Rendah" | "Sedang" | "Tinggi" | "Sangat Tinggi" | null;
+  nilaiResidual?: number | null;
+  levelResidual?: "Rendah" | "Sedang" | "Tinggi" | "Sangat Tinggi" | null;
 
   actionPlan: string | null;
   pic: string | null;
   keteranganUser: string | null;
+  keteranganAdmin?: string | null;
 
   created_at?: string | null;
   updated_at?: string | null;
 
   // hasil review
-  decision: "approved" | "rejected" | null;
-  note: string | null;
-  reviewer_name: string | null;
-  reviewed_at: string | null;
+  decision?: "approved" | "rejected" | null;
+  note?: string | null;
+  reviewer_name?: string | null;
+  reviewed_at?: string | null;
 };
 
 
@@ -107,7 +108,7 @@ export function mapToAssessment(row: RCSAData, userId: number, unitId: number) {
   const levelResidual = getLevelLabel(nilaiResidual);
   return {
     id: row.id,
-    rcsa_master_id: row.rcsa_master_id ?? row.rcsaMasterId,
+    rcsa_master_id: row.rcsa_master_id,
     unit_id: unitId,
     created_by: userId,
     potensi_risiko: row.potensiRisiko ?? "",
@@ -161,13 +162,13 @@ export function mapPayloadToRCSAData(
     pic: payload.pic ?? null, 
     keteranganAdmin: payload.keterangan_admin ?? null,
     keteranganUser: payload.keterangan_user ?? null, // **UPDATE: Mapping dari payload DB**
-    status: payload.status as "draft" | "submitted" | "reviewed",
+    status: (payload.status || "draft") as "draft" | "submitted" | "reviewed",
   };
 }
 
 
 // ================= API CALLS =================
-const API_BASE = "http://localhost:5000";
+import { API_BASE } from "./api";
 
 // Ambil draft user (assessment yang belum submit)
   export const getRcsaDraft = async (
@@ -311,8 +312,8 @@ export async function saveRcsaAssessment(data: any) {
 
   const res = await fetch(
     data.id
-      ? `http://localhost:5000/rcsa/assessment/${data.id}`
-      : `http://localhost:5000/rcsa/assessment`,
+      ? `${API_BASE}/rcsa/assessment/${data.id}`
+      : `${API_BASE}/rcsa/assessment`,
     {
       method: data.id ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
@@ -375,7 +376,7 @@ export const getAllRcsaSubmissions = async (): Promise<RCSAData[]> => {
 };
 
 export async function getRcsaArchive(): Promise<RCSAData[]> {
-  const res = await fetch("http://localhost:5000/rcsa/report/reviewed", {
+  const res = await fetch(`${API_BASE}/rcsa/report/reviewed`, {
     credentials: "include",
   });
 
@@ -423,6 +424,3 @@ export async function getRcsaArchive(): Promise<RCSAData[]> {
     updated_at: r.updated_at ?? null,
   }));
 }
-
-
-

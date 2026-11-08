@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { RiskTable } from "@/components/rcsa/RcsaTable";
 import type { RCSAData } from "@/lib/rcsa-data";
 import { toCamelCase } from "@/lib/utils";
+import { API_BASE } from "@/lib/api";
 
 type QueueItem = {
   id: number;
@@ -63,8 +64,6 @@ type NoteItem = {
   created_at: string;
   reviewer_name: string;
 };
-
-const API_BASE = "http://localhost:5000";
 
 function formatDateTime(iso?: string | null) {
   if (!iso) return "-";

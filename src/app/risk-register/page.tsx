@@ -114,12 +114,12 @@ const isIncomplete = (r: any) => r.status === "draft";
             data={filteredRows}
             onChange={handleChange}
             onAutoSave={handleAutoSave}
-            onBulkSubmit={() =>
+            onBulkSubmit={async () => {
               toast({
                 title: "Fitur belum tersedia",
                 description: "Kirim massal akan diaktifkan nanti.",
-              })
-            }
+              });
+            }}
           />
         )}
       </div>

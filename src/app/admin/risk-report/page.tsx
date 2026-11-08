@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RefreshCw, CheckCircle, FileDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import * as XLSX from "xlsx";
 
 export default function RiskRegisterPage() {
   const { fetchWithAuth } = useAuth();
@@ -71,17 +72,14 @@ export default function RiskRegisterPage() {
 
     const handleDownloadExcel = async () => {
     try {
-      const res = await fetch("http://localhost:5000/approved-risks/export");
+      const res = await fetchWithAuth("/risks");
       if (!res.ok) throw new Error("Gagal download");
 
-      // Buat blob dan trigger download
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "approved_risks.xlsx";
-      link.click();
-      window.URL.revokeObjectURL(url);
+      const risks = await res.json();
+      const worksheet = XLSX.utils.json_to_sheet(risks);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Risks");
+      XLSX.writeFile(workbook, "approved_risks.xlsx");
     } catch (err) {
       console.error(err);
       toast({ title: "Error", description: "Gagal download Excel" });

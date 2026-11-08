@@ -80,7 +80,7 @@ const handleToggleStatus = async (user: User) => {
   const nextStatus = user.status === "active" ? "inactive" : "active";
 
   try {
-    const res = await fetchWithAuth(`http://localhost:5000/users/${user.id}/status`, {
+    const res = await fetchWithAuth(`/users/${user.id}/status`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: nextStatus }),
